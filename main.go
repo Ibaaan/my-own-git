@@ -19,21 +19,12 @@ func check(err error) {
 }
 
 func main() {
-
-	// cmd_init("test")
-	// h := sha1.New()
-	// io.WriteString(h, "His money is twice tainted:")
-	// // io.WriteString(h, " 	")
-	// fmt.Printf("% x", h.Sum(nil))
-
-	// fmt.Printf("%x\n", zlibCommpress([]byte("Hello World")))
-	// v := zlibCommpress([]byte("Hello World"))
-	// fmt.Println(string(zlibDecommpress(v)))
 	// cmdInit("test")
 	writeData("test", []byte("Hello World"), "blob")
 	// fmt.Println(byteObject([]byte("Hello World"), "blob"))
 	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
-	readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
+	s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
+	fmt.Println(string(s), b)
 }
 
 func cmdInit(path string) {
@@ -92,7 +83,7 @@ func writeData(path string, data []byte, obj_type string) {
 	check(err)
 }
 
-func readData(path string) (string, []byte) {
+func readData(path string) ([]byte, string) {
 	fileData, _ := os.ReadFile(path)
 	decompressedData := zlibDecommpress(fileData)
 
@@ -106,5 +97,9 @@ func readData(path string) (string, []byte) {
 	if i, err := strconv.Atoi(dataLen); i != len(mainData) {
 		panic(err)
 	}
-	return objType, mainData
+	return mainData, objType
+}
+
+func findObject(sha1Prefix string) (string, error) {
+	return "", nil
 }
