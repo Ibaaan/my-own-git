@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,11 +21,11 @@ func check(err error) {
 
 func main() {
 	// cmdInit("test")
-	writeData("test", []byte("Hello World"), "blob")
+	// writeData("test", []byte("Hello World"), "blob")
 	// fmt.Println(byteObject([]byte("Hello World"), "blob"))
 	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
-	s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
-	fmt.Println(string(s), b)
+	// s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
+	fmt.Println(findObject("5e"))
 }
 
 func cmdInit(path string) {
@@ -101,5 +102,29 @@ func readData(path string) ([]byte, string) {
 }
 
 func findObject(sha1Prefix string) (string, error) {
-	return "", nil
+	if len(sha1Prefix) < 2 {
+		return "", errors.New("sha prefix should be 2 or longer")
+	}
+
+	objDir := filepath.Join(".git", "objects", sha1Prefix[:2])
+	files, err := os.ReadDir(objDir)
+	if err != nil {
+		return "", err
+	}
+
+	if len(files) != 1 {
+		return "", fmt.Errorf("there are (%d) obj's with prefix %s, should be only 1",
+			len(files), sha1Prefix)
+	}
+	return filepath.Join(objDir, files[0].Name()), nil
+}
+
+func readObject(sha1Prefix string) ([]byte, string) {
+	path, err := findObject(sha1Prefix)
+	check(err)
+	return readData(path)
+}
+
+func catFile(mode string, sha1Prefix string) {
+	// Someday will print smth
 }
