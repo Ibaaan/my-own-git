@@ -63,9 +63,9 @@ func testParseIndexEntry() {
 
 	// Also test with various path lengths
 	testPaths := []string{
-		"a",                       // short
-		"src/main.go",             // medium
-		string(make([]byte, 100)), // long
+		"a",           // short
+		"src/main.go", // medium
+		"11111111111111111111111111111111111111111111111111111111111111111111111111111", // long
 	}
 
 	for _, path := range testPaths {

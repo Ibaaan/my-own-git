@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,7 +28,9 @@ func main() {
 	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
 	// s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
 	// fmt.Println(findObject("5e"))
-	RunTests()
+	// RunTests()
+
+	writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
 }
 
 func cmdInit(path string) {
@@ -75,7 +78,7 @@ func zlibDecommpress(data []byte) []byte {
 	return decompressed
 }
 
-func writeData(path string, data []byte, obj_type string) {
+func writeObject(path string, data []byte, obj_type string) {
 	fullData := byteObject(data, obj_type)
 	hashData := fmt.Sprintf("%x", hashData(fullData))
 	filePath := filepath.Join(path, ".git", "objects", hashData[:2])
@@ -149,6 +152,7 @@ type IndexEntry struct {
 
 func (e *IndexEntry) bytes() []byte {
 	buf := new(bytes.Buffer)
+
 	binary.Write(buf, binary.BigEndian, e.CtimeSeconds)
 	binary.Write(buf, binary.BigEndian, e.CtimeNanoseconds)
 	binary.Write(buf, binary.BigEndian, e.MtimeSeconds)
@@ -207,4 +211,21 @@ func parseIndexEntry(data []byte) (*IndexEntry, error) {
 	entry.Path = string(data[62:nullIndex])
 
 	return &entry, nil
+}
+
+func writeIndex(entries []IndexEntry) {
+	buf := new(bytes.Buffer)
+	//header
+	binary.Write(buf, binary.BigEndian, []byte("DIRC"))
+	binary.Write(buf, binary.BigEndian, uint32(2))
+	binary.Write(buf, binary.BigEndian, uint32(len(entries)))
+	//main data
+	for _, en := range entries {
+		binary.Write(buf, binary.BigEndian, en.bytes())
+	}
+	//sha1
+	binary.Write(buf, binary.BigEndian, hashData(buf.Bytes()))
+	err := os.WriteFile(path.Join(".git", "index"), buf.Bytes(), os.FileMode(0755))
+	check(err)
+	fmt.Printf("Wrote to index %x\n", buf.Bytes())
 }
