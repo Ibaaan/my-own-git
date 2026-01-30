@@ -2,7 +2,12 @@ package main
 
 import "fmt"
 
-func TestIndexEntryBytes() {
+func RunTests() {
+	testIndexEntryBytes()
+	testParseIndexEntry()
+}
+
+func testIndexEntryBytes() {
 	entry := &IndexEntry{
 		CtimeSeconds: 1600000000,
 		MtimeSeconds: 1600000000,
@@ -29,4 +34,51 @@ func TestIndexEntryBytes() {
 	}
 
 	fmt.Println("✓ Entry bytes are correct")
+}
+
+func testParseIndexEntry() {
+	// Create test data
+	entry := &IndexEntry{
+		CtimeSeconds: 1234567890,
+		MtimeSeconds: 1234567890,
+		Mode:         0x0000A494,
+		FileSize:     1024,
+		Sha:          [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
+		Path:         "README.md",
+	}
+
+	// Convert to bytes
+	data := entry.bytes()
+
+	// Parse back
+	parsed, err := parseIndexEntry(data)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Original path: %q\n", entry.Path)
+	fmt.Printf("Parsed path:   %q\n", parsed.Path)
+	fmt.Printf("Match: %v\n", entry.Path == parsed.Path)
+	fmt.Printf("Entry size: %d\n", len(data))
+
+	// Also test with various path lengths
+	testPaths := []string{
+		"a",                       // short
+		"src/main.go",             // medium
+		string(make([]byte, 100)), // long
+	}
+
+	for _, path := range testPaths {
+		entry.Path = path
+		data := entry.bytes()
+		parsed, err := parseIndexEntry(data)
+
+		if err != nil {
+			fmt.Printf("Error with path %q: %v\n", path, err)
+		} else if parsed.Path != path {
+			fmt.Printf("Path mismatch: %q != %q\n", parsed.Path, path)
+		} else {
+			fmt.Printf("✓ Path %q parsed correctly \n", path)
+		}
+	}
 }

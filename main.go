@@ -27,7 +27,7 @@ func main() {
 	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
 	// s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
 	// fmt.Println(findObject("5e"))
-	TestIndexEntryBytes()
+	RunTests()
 }
 
 func cmdInit(path string) {
@@ -173,7 +173,38 @@ func (e *IndexEntry) bytes() []byte {
 	return buf.Bytes()
 }
 
-func byteToIndexEntry(byteIndex []byte) *IndexEntry {
-	// TODO: implement from byte to index
-	return &IndexEntry{}
+func parseIndexEntry(data []byte) (*IndexEntry, error) {
+	if len(data) < 63 {
+		return nil, fmt.Errorf("data too short")
+	}
+
+	entry := IndexEntry{}
+
+	entry.CtimeSeconds = binary.BigEndian.Uint32(data[0:4])
+	entry.CtimeNanoseconds = binary.BigEndian.Uint32(data[4:8])
+	entry.MtimeSeconds = binary.BigEndian.Uint32(data[8:12])
+	entry.MtimeNanoseconds = binary.BigEndian.Uint32(data[12:16])
+	entry.Dev = binary.BigEndian.Uint32(data[16:20])
+	entry.Ino = binary.BigEndian.Uint32(data[20:24])
+	entry.Mode = binary.BigEndian.Uint32(data[24:28])
+	entry.Uid = binary.BigEndian.Uint32(data[28:32])
+	entry.Gid = binary.BigEndian.Uint32(data[32:36])
+	entry.FileSize = binary.BigEndian.Uint32(data[36:40])
+	copy(entry.Sha[:], data[40:60])
+	entry.Flags = binary.BigEndian.Uint16(data[60:62])
+
+	nullIndex := -1
+	for i := 62; i < len(data); i++ {
+		if data[i] == byte(0) {
+			nullIndex = i
+			break
+		}
+	}
+
+	if nullIndex == -1 {
+		return nil, fmt.Errorf("null terminator not found")
+	}
+	entry.Path = string(data[62:nullIndex])
+
+	return &entry, nil
 }
