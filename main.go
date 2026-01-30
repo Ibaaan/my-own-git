@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"crypto/sha1"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -25,7 +26,8 @@ func main() {
 	// fmt.Println(byteObject([]byte("Hello World"), "blob"))
 	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
 	// s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
-	fmt.Println(findObject("5e"))
+	// fmt.Println(findObject("5e"))
+	TestIndexEntryBytes()
 }
 
 func cmdInit(path string) {
@@ -127,4 +129,51 @@ func readObject(sha1Prefix string) ([]byte, string) {
 
 func catFile(mode string, sha1Prefix string) {
 	// Someday will print smth
+}
+
+type IndexEntry struct {
+	CtimeSeconds     uint32
+	CtimeNanoseconds uint32
+	MtimeSeconds     uint32
+	MtimeNanoseconds uint32
+	Dev              uint32
+	Ino              uint32
+	Mode             uint32
+	Uid              uint32
+	Gid              uint32
+	FileSize         uint32
+	Sha              [20]byte
+	Flags            uint16
+	Path             string
+}
+
+func (e *IndexEntry) bytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, e.CtimeSeconds)
+	binary.Write(buf, binary.BigEndian, e.CtimeNanoseconds)
+	binary.Write(buf, binary.BigEndian, e.MtimeSeconds)
+	binary.Write(buf, binary.BigEndian, e.MtimeNanoseconds)
+	binary.Write(buf, binary.BigEndian, e.Dev)
+	binary.Write(buf, binary.BigEndian, e.Ino)
+	binary.Write(buf, binary.BigEndian, e.Mode)
+	binary.Write(buf, binary.BigEndian, e.Uid)
+	binary.Write(buf, binary.BigEndian, e.Gid)
+	binary.Write(buf, binary.BigEndian, e.FileSize)
+	binary.Write(buf, binary.BigEndian, e.Sha)
+	binary.Write(buf, binary.BigEndian, e.Flags)
+	binary.Write(buf, binary.BigEndian, []byte(e.Path))
+	binary.Write(buf, binary.BigEndian, byte(0))
+
+	pos := 63 + len([]byte(e.Path))
+	for pos%8 != 0 {
+		binary.Write(buf, binary.BigEndian, byte(0))
+		pos++
+	}
+
+	return buf.Bytes()
+}
+
+func byteToIndexEntry(byteIndex []byte) *IndexEntry {
+	// TODO: implement from byte to index
+	return &IndexEntry{}
 }
