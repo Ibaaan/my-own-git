@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -30,7 +31,8 @@ func main() {
 	// fmt.Println(findObject("5e"))
 	// RunTests()
 
-	writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
+	// writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
+	readIndex()
 }
 
 func cmdInit(path string) {
@@ -177,9 +179,9 @@ func (e *IndexEntry) bytes() []byte {
 	return buf.Bytes()
 }
 
-func parseIndexEntry(data []byte) (*IndexEntry, error) {
+func parseIndexEntry(data []byte) (*IndexEntry, int, error) {
 	if len(data) < 63 {
-		return nil, fmt.Errorf("data too short")
+		return nil, 0, fmt.Errorf("data too short")
 	}
 
 	entry := IndexEntry{}
@@ -206,11 +208,11 @@ func parseIndexEntry(data []byte) (*IndexEntry, error) {
 	}
 
 	if nullIndex == -1 {
-		return nil, fmt.Errorf("null terminator not found")
+		return nil, 0, fmt.Errorf("null terminator not found")
 	}
 	entry.Path = string(data[62:nullIndex])
 
-	return &entry, nil
+	return &entry, nullIndex, nil
 }
 
 func writeIndex(entries []IndexEntry) {
@@ -228,4 +230,25 @@ func writeIndex(entries []IndexEntry) {
 	err := os.WriteFile(path.Join(".git", "index"), buf.Bytes(), os.FileMode(0755))
 	check(err)
 	fmt.Printf("Wrote to index %x\n", buf.Bytes())
+}
+
+func readIndex() ([]IndexEntry, error) {
+	data, err := os.ReadFile(path.Join(".git", "index"))
+	if err != nil {
+		return nil, err
+	}
+
+	if !reflect.DeepEqual(hashData(data[:len(data)-20]), data[len(data)-20:]) {
+		return nil, fmt.Errorf("Check sums aren't equal")
+	}
+
+	if string(data[:4]) != "DIRC" {
+		return nil, fmt.Errorf("Sync word(%s) doesn't equal to DIRC", string(data[:4]))
+	}
+
+	fmt.Println(len(data[12:len(data)-20]), binary.BigEndian.Uint32(data[8:12]))
+	entry, index, _ := parseIndexEntry(data[12+72+72+72+72+72:])
+	fmt.Println(entry.Path, index)
+
+	return nil, nil
 }

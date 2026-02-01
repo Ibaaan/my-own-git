@@ -51,7 +51,7 @@ func testParseIndexEntry() {
 	data := entry.bytes()
 
 	// Parse back
-	parsed, err := parseIndexEntry(data)
+	parsed, _, err := parseIndexEntry(data)
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func testParseIndexEntry() {
 	for _, path := range testPaths {
 		entry.Path = path
 		data := entry.bytes()
-		parsed, err := parseIndexEntry(data)
+		parsed, _, err := parseIndexEntry(data)
 
 		if err != nil {
 			fmt.Printf("Error with path %q: %v\n", path, err)
