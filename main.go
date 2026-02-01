@@ -32,7 +32,7 @@ func main() {
 	// RunTests()
 
 	// writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
-	readIndex()
+	fmt.Println(readIndex())
 }
 
 func cmdInit(path string) {
@@ -179,9 +179,9 @@ func (e *IndexEntry) bytes() []byte {
 	return buf.Bytes()
 }
 
-func parseIndexEntry(data []byte) (*IndexEntry, int, error) {
+func parseIndexEntry(data []byte) (IndexEntry, int, error) {
 	if len(data) < 63 {
-		return nil, 0, fmt.Errorf("data too short")
+		return IndexEntry{}, 0, fmt.Errorf("data too short")
 	}
 
 	entry := IndexEntry{}
@@ -208,11 +208,11 @@ func parseIndexEntry(data []byte) (*IndexEntry, int, error) {
 	}
 
 	if nullIndex == -1 {
-		return nil, 0, fmt.Errorf("null terminator not found")
+		return IndexEntry{}, 0, fmt.Errorf("null terminator not found")
 	}
 	entry.Path = string(data[62:nullIndex])
 
-	return &entry, nullIndex, nil
+	return entry, nullIndex + (8 - nullIndex%8), nil
 }
 
 func writeIndex(entries []IndexEntry) {
@@ -246,9 +246,13 @@ func readIndex() ([]IndexEntry, error) {
 		return nil, fmt.Errorf("Sync word(%s) doesn't equal to DIRC", string(data[:4]))
 	}
 
-	fmt.Println(len(data[12:len(data)-20]), binary.BigEndian.Uint32(data[8:12]))
-	entry, index, _ := parseIndexEntry(data[12+72+72+72+72+72:])
-	fmt.Println(entry.Path, index)
-
-	return nil, nil
+	i := 12
+	entry, index, err := parseIndexEntry(data[i:])
+	entries := []IndexEntry{}
+	for err == nil {
+		entries = append(entries, entry)
+		i += index
+		entry, index, err = parseIndexEntry(data[i:])
+	}
+	return entries, nil
 }
