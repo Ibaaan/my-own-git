@@ -37,27 +37,24 @@ func main() {
 	// fmt.Println(readIndex())
 	// s, _ := listFiles(".")
 	// fmt.Println(s)
-	getStatus()
+	// getStatus()
 
 	// // Create a test file
 	// testContent := "Hello, Git!\n"
 	// os.WriteFile("test.txt", []byte(testContent), 0644)
 
-	// // Calculate hash
-	// sha, err := gitBlobHash("test.txt")
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
-	// data, _ := os.ReadFile("test.txt")
-	// mySha := hashData(byteObject(data, "blob"))
+	// Calculate hash
+	name := "sample.go"
+	sha, err := gitBlobHash(name)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	data, _ := os.ReadFile(name)
+	mySha := hashData(byteObject(data, "blob"))
 
-	// fmt.Printf("Calculated SHA: %s\n", sha)
-	// fmt.Printf("My SHA:         %s\n", hex.EncodeToString(mySha))
-	// fmt.Printf("Expected:       8ab686eafeb1f44702738c8b0f24f2567c36da6d\n")
-
-	// Compare with actual Git
-	// Run: git hash-object test.txt
+	fmt.Printf("Calculated SHA: %s\n", sha)
+	fmt.Printf("My SHA:         %s\n", hex.EncodeToString(mySha))
 }
 
 func cmdInit(path string) {
@@ -340,7 +337,9 @@ func getStatus() ([]string, []string, []string) {
 				// fmt.Println("new cal: ", hex.EncodeToString(hashData(byteObject(data, "blob"))))
 
 				DebugSHA(entry)
-				fmt.Printf("SHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
+				fmt.Printf("mySHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
+				s, _ := gitBlobHash(entry.Path)
+				fmt.Printf("gptSHA (hex): %s\n", s)
 				break
 			}
 		}
@@ -356,4 +355,23 @@ func DebugSHA(entry IndexEntry) {
 
 	// Verify this matches git's output
 	fmt.Printf("Compare with: git ls-files --stage | grep %s\n", entry.Path)
+}
+
+func gitBlobHash(filename string) (string, error) {
+	// 1. Read file as binary
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. Create Git blob header
+	// Format: "blob " + decimal_size + "\0"
+	header := fmt.Sprintf("blob %d\x00", len(content))
+
+	// 3. Compute SHA1 of header + content
+	hash := sha1.New()
+	hash.Write([]byte(header))
+	hash.Write(content)
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
