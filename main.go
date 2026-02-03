@@ -37,7 +37,7 @@ func main() {
 	// fmt.Println(readIndex())
 	// s, _ := listFiles(".")
 	// fmt.Println(s)
-	// getStatus()
+	getStatus()
 
 	// // Create a test file
 	// testContent := "Hello, Git!\n"
@@ -307,6 +307,7 @@ func listFiles(root string) ([]string, error) {
 }
 
 // return changed_Paths, newPaths, deletedPaths
+// PROTESTIT KAKOGO HUYA NE RABOATAET SO STARbIMI FAILAMI, NO RABOTAET S NOVbIMI
 func getStatus() ([]string, []string, []string) {
 	allFilepaths, _ := listFiles(".")
 	paths := make(map[string]bool)
@@ -332,15 +333,15 @@ func getStatus() ([]string, []string, []string) {
 			data, _ := os.ReadFile(entry.Path)
 
 			if entry.Sha != [20]byte(hashData(byteObject(data, "blob"))) {
-				// fmt.Println(entry.Path)
-				// fmt.Println("index:   ", hex.EncodeToString(entry.Sha[:]))
-				// fmt.Println("new cal: ", hex.EncodeToString(hashData(byteObject(data, "blob"))))
+				fmt.Println(entry.Path)
+				fmt.Println("index:   ", hex.EncodeToString(entry.Sha[:]))
+				fmt.Println("new cal: ", hex.EncodeToString(hashData(byteObject(data, "blob"))))
 
-				DebugSHA(entry)
-				fmt.Printf("mySHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
-				s, _ := gitBlobHash(entry.Path)
-				fmt.Printf("gptSHA (hex): %s\n", s)
-				break
+				// DebugSHA(entry)
+				// fmt.Printf("mySHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
+				// s, _ := gitBlobHash(entry.Path)
+				// fmt.Printf("gptSHA (hex): %s\n", s)
+				// break
 			}
 		}
 	}
