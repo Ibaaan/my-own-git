@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,27 @@ func main() {
 	// fmt.Println(readIndex())
 	// s, _ := listFiles(".")
 	// fmt.Println(s)
+	getStatus()
+
+	// // Create a test file
+	// testContent := "Hello, Git!\n"
+	// os.WriteFile("test.txt", []byte(testContent), 0644)
+
+	// // Calculate hash
+	// sha, err := gitBlobHash("test.txt")
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
+	// data, _ := os.ReadFile("test.txt")
+	// mySha := hashData(byteObject(data, "blob"))
+
+	// fmt.Printf("Calculated SHA: %s\n", sha)
+	// fmt.Printf("My SHA:         %s\n", hex.EncodeToString(mySha))
+	// fmt.Printf("Expected:       8ab686eafeb1f44702738c8b0f24f2567c36da6d\n")
+
+	// Compare with actual Git
+	// Run: git hash-object test.txt
 }
 
 func cmdInit(path string) {
@@ -54,11 +76,12 @@ func hashData(data []byte) []byte {
 	return h.Sum(nil)
 }
 
+// Return full data of file data
+// Combines header (obj_type data_len) + 0 + data_from_file
 func byteObject(data []byte, obj_type string) []byte {
-	header := []byte(fmt.Sprintf("%s %d", obj_type, len(data)))
-	fullData := append(header, []byte{0x00}...)
-	fullData = append(fullData, data...)
-	fmt.Println(header, data)
+	header := []byte(fmt.Sprintf("%s %d\x00", obj_type, len(data)))
+	fullData := append(header, data...)
+	// fmt.Println(header, data)
 	return fullData
 }
 
@@ -85,7 +108,7 @@ func zlibDecommpress(data []byte) []byte {
 
 func writeObject(path string, data []byte, obj_type string) {
 	fullData := byteObject(data, obj_type)
-	hashData := fmt.Sprintf("%x", hashData(fullData))
+	hashData := fmt.Sprintf("%x", sha1.Sum(fullData))
 	filePath := filepath.Join(path, ".git", "objects", hashData[:2])
 	err := os.MkdirAll(filePath, os.FileMode(0755))
 	check(err)
@@ -286,11 +309,51 @@ func listFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func getStatus() ([]IndexEntry, []IndexEntry, []IndexEntry) {
+// return changed_Paths, newPaths, deletedPaths
+func getStatus() ([]string, []string, []string) {
 	allFilepaths, _ := listFiles(".")
-	indexEntries, _ := readIndex()
-	for _, entry := range indexEntries {
-		fmt.Println(entry.Sha)
-		fmt.Println(hashData(readData())))
+	paths := make(map[string]bool)
+	for _, fp := range allFilepaths {
+		paths[fp] = false
 	}
+
+	// var entriesByPath map[string]IndexEntry
+	indexEntries, _ := readIndex()
+
+	changedPaths := []string{}
+	newPaths := []string{}
+	deletedPaths := []string{}
+	for _, entry := range indexEntries {
+		_, ok := paths[entry.Path]
+
+		if !ok {
+			deletedPaths = append(deletedPaths, entry.Path)
+			fmt.Println("deleted : ", entry.Path)
+		} else {
+			paths[entry.Path] = true
+
+			data, _ := os.ReadFile(entry.Path)
+
+			if entry.Sha != [20]byte(hashData(byteObject(data, "blob"))) {
+				// fmt.Println(entry.Path)
+				// fmt.Println("index:   ", hex.EncodeToString(entry.Sha[:]))
+				// fmt.Println("new cal: ", hex.EncodeToString(hashData(byteObject(data, "blob"))))
+
+				DebugSHA(entry)
+				fmt.Printf("SHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
+				break
+			}
+		}
+	}
+
+	return changedPaths, newPaths, deletedPaths
+}
+
+func DebugSHA(entry IndexEntry) {
+	fmt.Printf("Path: %s\n", entry.Path)
+	fmt.Printf("SHA (hex): %x\n", entry.Sha)
+	fmt.Printf("SHA (string): %s\n", hex.EncodeToString(entry.Sha[:]))
+
+	// Verify this matches git's output
+	fmt.Printf("Compare with: git ls-files --stage | grep %s\n", entry.Path)
 }
