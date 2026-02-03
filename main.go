@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -32,7 +33,9 @@ func main() {
 	// RunTests()
 
 	// writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
-	fmt.Println(readIndex())
+	// fmt.Println(readIndex())
+	// s, _ := listFiles(".")
+	// fmt.Println(s)
 }
 
 func cmdInit(path string) {
@@ -255,4 +258,39 @@ func readIndex() ([]IndexEntry, error) {
 		entry, index, err = parseIndexEntry(data[i:])
 	}
 	return entries, nil
+}
+
+func listFiles(root string) ([]string, error) {
+	var files []string
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		for _, d := range strings.Split(path, string(filepath.Separator)) {
+			if d == ".git" {
+				return nil
+			}
+		}
+
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+func getStatus() ([]IndexEntry, []IndexEntry, []IndexEntry) {
+	allFilepaths, _ := listFiles(".")
+	indexEntries, _ := readIndex()
+	for _, entry := range indexEntries {
+		fmt.Println(entry.Sha)
+		fmt.Println(hashData(readData())))
+	}
 }
