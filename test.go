@@ -1,84 +1,36 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
-func RunTests() {
-	testIndexEntryBytes()
-	testParseIndexEntry()
+func testWhole() {
+	fmt.Println("Init a repo")
+	cmdInit(".")
+
+	fmt.Println("Creating a.txt | Hello World! > a.txt")
+	os.WriteFile("a.txt", []byte("Hello World!\n"), os.FileMode(0755))
+	printIndexAndStatus()
+
+	fmt.Println("Adding a.txt to index")
+	add([]string{"a.txt"})
+	printIndexAndStatus()
+
+	fmt.Println("Changing a.txt | Not hello > a.txt")
+	os.WriteFile("a.txt", []byte("Not hello\n"), os.FileMode(0755))
+	printIndexAndStatus()
+
+	fmt.Println("Adding a.txt to index")
+	add([]string{"a.txt"})
+	printIndexAndStatus()
 }
 
-func testIndexEntryBytes() {
-	entry := &IndexEntry{
-		CtimeSeconds: 1600000000,
-		MtimeSeconds: 1600000000,
-		Mode:         0x0000A494, // 100644 in octal
-		FileSize:     1024,
-		Sha:          [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
-		Path:         "README.md",
-	}
-
-	data := entry.bytes()
-
-	fmt.Printf("Total size: %d bytes\n", len(data))
-	fmt.Printf("Fixed part: %d bytes\n", 62)
-	fmt.Printf("Path + null: %d bytes\n", len(entry.Path)+1)
-	fmt.Printf("Padding: %d bytes\n", len(data)-62-len(entry.Path)-1)
-
-	// Verify structure
-	if data[62+len(entry.Path)] != 0 {
-		panic("Missing null terminator!")
-	}
-
-	if len(data)%8 != 0 {
-		panic("Not 8-byte aligned!")
-	}
-
-	fmt.Println("✓ Entry bytes are correct")
-}
-
-func testParseIndexEntry() {
-	// Create test data
-	entry := &IndexEntry{
-		CtimeSeconds: 1234567890,
-		MtimeSeconds: 1234567890,
-		Mode:         0x0000A494,
-		FileSize:     1024,
-		Sha:          [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
-		Path:         "README.md",
-	}
-
-	// Convert to bytes
-	data := entry.bytes()
-
-	// Parse back
-	parsed, _, err := parseIndexEntry(data)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Original path: %q\n", entry.Path)
-	fmt.Printf("Parsed path:   %q\n", parsed.Path)
-	fmt.Printf("Match: %v\n", entry.Path == parsed.Path)
-	fmt.Printf("Entry size: %d\n", len(data))
-
-	// Also test with various path lengths
-	testPaths := []string{
-		"a",           // short
-		"src/main.go", // medium
-		"11111111111111111111111111111111111111111111111111111111111111111111111111111", // long
-	}
-
-	for _, path := range testPaths {
-		entry.Path = path
-		data := entry.bytes()
-		parsed, _, err := parseIndexEntry(data)
-
-		if err != nil {
-			fmt.Printf("Error with path %q: %v\n", path, err)
-		} else if parsed.Path != path {
-			fmt.Printf("Path mismatch: %q != %q\n", parsed.Path, path)
-		} else {
-			fmt.Printf("✓ Path %q parsed correctly \n", path)
-		}
-	}
+func printIndexAndStatus() {
+	fmt.Println("\n\n")
+	fmt.Println("Index:")
+	lsFiles(true)
+	fmt.Println("\nStatus:")
+	status()
+	fmt.Println("\n\n")
 }

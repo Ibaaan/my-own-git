@@ -5,7 +5,6 @@ import (
 	"compress/zlib"
 	"crypto/sha1"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -25,46 +25,19 @@ func check(err error) {
 }
 
 func main() {
-	// cmdInit("test")
-	// writeData("test", []byte("Hello World"), "blob")
-	// fmt.Println(byteObject([]byte("Hello World"), "blob"))
-	//"test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689"
-	// s, b := readData("test/.git/objects/5e/1c309dae7f45e0f39b1bf3ac3cd9db12e7d689")
-	// fmt.Println(findObject("5e"))
-	// RunTests()
+	testWhole()
 
-	// writeIndex([]IndexEntry{IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}, IndexEntry{}})
-	// fmt.Println(readIndex())
-	// s, _ := listFiles(".")
-	// fmt.Println(s)
-	getStatus()
-
-	// // Create a test file
-	// testContent := "Hello, Git!\n"
-	// os.WriteFile("test.txt", []byte(testContent), 0644)
-
-	// Calculate hash
-	name := "sample.go"
-	sha, err := gitBlobHash(name)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	data, _ := os.ReadFile(name)
-	mySha := hashData(byteObject(data, "blob"))
-
-	fmt.Printf("Calculated SHA: %s\n", sha)
-	fmt.Printf("My SHA:         %s\n", hex.EncodeToString(mySha))
 }
 
 func cmdInit(path string) {
 	for _, name := range []string{"objects", "refs", "refs/heads"} {
-		fmt.Println(filepath.Join(path, ".git", name))
+		// fmt.Println(filepath.Join(path, ".git", name))
 		os.MkdirAll(filepath.Join(path, ".git", name), os.FileMode(0755))
 	}
 	err := os.WriteFile(filepath.Join(path, ".git", "HEAD"),
 		[]byte("ref: refs/heads/master"), os.FileMode(0755))
 	check(err)
+	writeIndex([]IndexEntry{})
 }
 
 func hashData(data []byte) []byte {
@@ -252,7 +225,7 @@ func writeIndex(entries []IndexEntry) {
 	binary.Write(buf, binary.BigEndian, hashData(buf.Bytes()))
 	err := os.WriteFile(path.Join(".git", "index"), buf.Bytes(), os.FileMode(0755))
 	check(err)
-	fmt.Printf("Wrote to index %x\n", buf.Bytes())
+	// fmt.Printf("Wrote to index %x\n", buf.Bytes())
 }
 
 func readIndex() ([]IndexEntry, error) {
@@ -280,7 +253,7 @@ func readIndex() ([]IndexEntry, error) {
 	return entries, nil
 }
 
-func listFiles(root string) ([]string, error) {
+func getFiles(root string) ([]string, error) {
 	var files []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -307,15 +280,13 @@ func listFiles(root string) ([]string, error) {
 }
 
 // return changed_Paths, newPaths, deletedPaths
-// PROTESTIT KAKOGO HUYA NE RABOATAET SO STARbIMI FAILAMI, NO RABOTAET S NOVbIMI
 func getStatus() ([]string, []string, []string) {
-	allFilepaths, _ := listFiles(".")
+	allFilepaths, _ := getFiles(".")
 	paths := make(map[string]bool)
 	for _, fp := range allFilepaths {
 		paths[fp] = false
 	}
 
-	// var entriesByPath map[string]IndexEntry
 	indexEntries, _ := readIndex()
 
 	changedPaths := []string{}
@@ -326,53 +297,147 @@ func getStatus() ([]string, []string, []string) {
 
 		if !ok {
 			deletedPaths = append(deletedPaths, entry.Path)
-			fmt.Println("deleted : ", entry.Path)
 		} else {
 			paths[entry.Path] = true
 
 			data, _ := os.ReadFile(entry.Path)
 
 			if entry.Sha != [20]byte(hashData(byteObject(data, "blob"))) {
-				fmt.Println(entry.Path)
-				fmt.Println("index:   ", hex.EncodeToString(entry.Sha[:]))
-				fmt.Println("new cal: ", hex.EncodeToString(hashData(byteObject(data, "blob"))))
-
-				// DebugSHA(entry)
-				// fmt.Printf("mySHA (hex): %x\n", [20]byte(hashData(byteObject(data, "blob"))))
-				// s, _ := gitBlobHash(entry.Path)
-				// fmt.Printf("gptSHA (hex): %s\n", s)
-				// break
+				changedPaths = append(changedPaths, entry.Path)
 			}
+		}
+	}
+
+	for path, v := range paths {
+		if !v {
+			newPaths = append(newPaths, path)
 		}
 	}
 
 	return changedPaths, newPaths, deletedPaths
 }
 
-func DebugSHA(entry IndexEntry) {
-	fmt.Printf("Path: %s\n", entry.Path)
-	fmt.Printf("SHA (hex): %x\n", entry.Sha)
-	fmt.Printf("SHA (string): %s\n", hex.EncodeToString(entry.Sha[:]))
+// print files
+// details=true - all info file mode, object type, hash, and filename
+// details=false - only filenames
+func lsFiles(details bool) {
+	entries, err := readIndex()
+	check(err)
 
-	// Verify this matches git's output
-	fmt.Printf("Compare with: git ls-files --stage | grep %s\n", entry.Path)
+	for _, entry := range entries {
+		if details {
+			stage := (entry.Flags >> 12) & 3
+			fmt.Printf("%06o %x %d\t%s\n",
+				entry.Mode, entry.Sha, stage, entry.Path)
+		} else {
+			fmt.Println(entry.Path)
+		}
+	}
 }
 
-func gitBlobHash(filename string) (string, error) {
-	// 1. Read file as binary
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return "", err
+func status() {
+	ch, new, del := getStatus()
+	fmt.Println("changed: ", ch)
+	fmt.Println("new:     ", new)
+	fmt.Println("del:     ", del)
+}
+
+func add(paths []string) {
+	allEntries, _ := readIndex()
+
+	entries := []IndexEntry{}
+	for _, entry := range allEntries {
+		shouldKeep := true
+		for _, path := range paths {
+			if entry.Path == path {
+				shouldKeep = false
+				break
+			}
+		}
+		if shouldKeep {
+			entries = append(entries, entry)
+		}
 	}
 
-	// 2. Create Git blob header
-	// Format: "blob " + decimal_size + "\0"
-	header := fmt.Sprintf("blob %d\x00", len(content))
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		check(err)
 
-	// 3. Compute SHA1 of header + content
-	hash := sha1.New()
-	hash.Write([]byte(header))
-	hash.Write(content)
+		fullData := byteObject(data, "blob")
+		hashData := sha1.Sum(fullData)
 
-	return hex.EncodeToString(hash.Sum(nil)), nil
+		info, err := os.Stat(path)
+		check(err)
+
+		flags := uint16(len(path))
+		if flags >= (1 << 12) {
+			panic(fmt.Sprintf("path too long: %s", path))
+		}
+
+		entry := IndexEntry{
+			CtimeSeconds:     0,
+			CtimeNanoseconds: 0,
+			MtimeSeconds:     uint32(info.ModTime().Unix()),
+			MtimeNanoseconds: 0,
+			FileSize:         uint32(info.Size()),
+			Mode:             uint32(info.Mode()),
+			Sha:              hashData,
+			Flags:            flags,
+			Path:             path,
+		}
+
+		entries = append(entries, entry)
+
+		writeObject(".", data, "blob")
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Path < entries[j].Path
+	})
+
+	writeIndex(entries)
+}
+
+func writeTree() []byte {
+	entries, err := readIndex()
+	check(err)
+
+	treeEntries := make([][]byte, 0)
+
+	for _, entry := range entries {
+		if strings.Contains(entry.Path, "/") {
+			panic("currently only supports a single, top-level directory")
+		}
+
+		modePath := fmt.Sprintf("%o %s", entry.Mode, entry.Path)
+		treeEntry := append([]byte(modePath), 0)
+		treeEntry = append(treeEntry, entry.Sha[:]...)
+
+		treeEntries = append(treeEntries, treeEntry)
+	}
+
+	sort.Slice(treeEntries, func(i, j int) bool {
+		iPath := string(bytes.SplitN(treeEntries[i], []byte{0}, 2)[0])
+		jPath := string(bytes.SplitN(treeEntries[j], []byte{0}, 2)[0])
+
+		iParts := strings.SplitN(iPath, " ", 2)
+		jParts := strings.SplitN(jPath, " ", 2)
+
+		if len(iParts) > 1 && len(jParts) > 1 {
+			return iParts[1] < jParts[1]
+		}
+		return iPath < jPath
+	})
+
+	var combined []byte
+	for _, entry := range treeEntries {
+		combined = append(combined, entry...)
+	}
+
+	writeObject(".", combined, "tree")
+
+	fullData := byteObject(combined, "tree")
+	hashData := sha1.Sum(fullData)
+
+	return hashData[:]
 }
